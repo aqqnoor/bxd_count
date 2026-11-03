@@ -45,6 +45,8 @@ def parse_args():
     p.add_argument("--batch", type=int, default=20, help="сколько аккаунтов за один запуск скрейпера")
     p.add_argument("--only", type=int, default=0, help="обработать только первых N блогеров (для теста)")
     p.add_argument("--token", default=None, help="токен Apify (или переменная APIFY_TOKEN)")
+    p.add_argument("--memory", default="", help="файл, где запоминаются найденные ролики (например docs/videos_memory.json): "
+                   "ролики, выпавшие из свежей части ленты, не теряются и не перечитываются")
     p.add_argument("--skip-ig", action="store_true")
     p.add_argument("--skip-tt", action="store_true")
     return p.parse_args()
@@ -229,6 +231,18 @@ def collect_platform(client, platform, pending, cache, a, tz, start, end, state)
             if len(parsed) >= a.max_videos and dates and min(dates) >= start:
                 rec[f"{platform}_warn"].append(
                     f"{label}: достигнут лимит {a.max_videos} роликов, возможно есть ещё (увеличьте --max-videos)")
+            # ролики, найденные раньше, но лежащие глубже прочитанной части ленты, остаются как были;
+            # если ролик моложе самого старого прочитанного, но не вернулся, его удалили или сняли хэштег
+            prev = rec.get(f"{platform}_prev") or []
+            if prev:
+                seen = {v["id"] for v in videos}
+                oldest = min(dates).isoformat() if dates and len(parsed) >= a.max_videos else None
+                for v in prev:
+                    if v["id"] in seen:
+                        continue
+                    pub = datetime.fromisoformat(v["published"])
+                    if oldest and v["published"] < oldest and start <= pub <= end:
+                        videos.append(v)
             rec[platform] = videos
             rec[f"{platform}_err"] = None
             rec[f"{platform}_done"] = True
@@ -260,6 +274,11 @@ def main():
         with open(CACHE, encoding="utf-8") as f:
             cache = json.load(f)
 
+    memory = {}
+    if a.memory and os.path.exists(a.memory) and os.path.getsize(a.memory) > 0:
+        with open(a.memory, encoding="utf-8") as f:
+            memory = json.load(f)
+
     pending_tt, pending_ig = [], []
     for b in bloggers:
         name = (b.get("name") or "").strip()
@@ -269,6 +288,8 @@ def main():
         for k, v in (("tt", []), ("ig", []), ("tt_err", None), ("ig_err", None),
                      ("tt_warn", []), ("ig_warn", [])):
             rec.setdefault(k, v)
+        rec["tt_prev"] = memory.get(key, {}).get("tt", [])
+        rec["ig_prev"] = memory.get(key, {}).get("ig", [])
         rec.setdefault("tt_done", not tt)
         rec.setdefault("ig_done", not ig)
         if tt and not rec["tt_done"] and not a.skip_tt:
@@ -286,6 +307,14 @@ def main():
     except KeyboardInterrupt:
         print("\nОстановлено вручную. Собранное сохранено в cache.json; строю отчёт по тому, что есть.")
     save_cache(cache)
+    if a.memory:
+        mem = {k: {"tt": r.get("tt", []), "ig": r.get("ig", [])} for k, r in cache.items()
+               if (r.get("tt_done") or r.get("ig_done"))}
+        for k, v in memory.items():          # блогеры, которых не трогали в этом запуске, не теряем
+            mem.setdefault(k, v)
+        os.makedirs(os.path.dirname(a.memory) or ".", exist_ok=True)
+        with open(a.memory, "w", encoding="utf-8") as f:
+            json.dump(mem, f, ensure_ascii=False)
     print(f"Расход Apify за этот запуск ≈ ${state['cost']:.3f}")
 
     # ---- сбор результата ----

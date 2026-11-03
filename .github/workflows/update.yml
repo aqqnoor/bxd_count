@@ -2,8 +2,13 @@ name: Update ranking
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 */6 * * *"
+    inputs:
+      max_videos:
+        description: "Сколько последних роликов читать у каждого блогера (для первого запуска ставьте 40-60)"
+        default: "40"
+#   schedule:
+#     - cron: "0 3 * * *"   # каждый день 08:00 по Алматы: свежая часть ленты (10 роликов)
+#     - cron: "0 2 * * 1"   # по понедельникам 07:00 по Алматы: глубокий проход (40 роликов)
 
 permissions:
   contents: write
@@ -19,17 +24,19 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install apify-client openpyxl
-      - name: Collect views
+      - name: Collect views (Instagram only)
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          MAX: ${{ github.event.inputs.max_videos || (github.event.schedule == '0 2 * * 1' && '40' || '10') }}
         run: |
-          python bxd_count.py --bloggers bloggers.csv --start 2026-10-01 --end 2026-11-03 \
-            --max-videos 15 --json results.json --out result.xlsx
-        #   cp results.json docs/results.json
+          python bxd_count.py --bloggers bloggers.csv --start 2026-10-01 --end "$(TZ=Asia/Almaty date +%F)" \
+            --max-videos "$MAX" --skip-tt --memory docs/videos_memory.json \
+            --json results.json --out result.xlsx
+          cp results.json docs/results.json
       - name: Commit data
         run: |
           git config user.name "bxd-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add docs/results.json
+          git add docs/results.json docs/videos_memory.json
           git diff --cached --quiet || git commit -m "Update ranking data"
           git push
