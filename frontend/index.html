@@ -261,7 +261,7 @@
   }
 
   function renderLeader(d) {
-    var r = d.rows.length && d.rows[0].total != null ? d.rows[0] : null;
+    var r = d.rows.length && d.rows[0].total > 0 ? d.rows[0] : null;   // пока нет просмотров, лидера не показываем
     var box = $("leader");
     box.hidden = !r;
     if (!r) return;
@@ -281,8 +281,7 @@
     renderStats(d); renderLeader(d);
     $("foot").textContent = "Считаются ролики, у которых хэштег #" + d.hashtag + " указан в подписи и которые опубликованы " +
       "в период кампании. Количество роликов показано для справки и на место в рейтинге не влияет. Стрелка показывает, " +
-      "на сколько мест участник поднялся или опустился с прошлого обновления, а «+» под числом — прирост просмотров за это время. " +
-      "Пометка «данные неполные» значит, что часть данных участника получить не удалось.";
+      "на сколько мест участник поднялся или опустился с прошлого обновления, а «+» под числом — прирост просмотров за это время.";
   }
 
   function keyOf(r) { return r.id != null ? "id" + r.id : "n" + r.name; }
@@ -311,7 +310,7 @@
     li._name.textContent = r.name;
     var v = r.total != null ? videosOf(r) : null;
     li._meta.textContent = v == null ? "" : videosText(v);
-    li._note.textContent = r.complete ? "" : "данные неполные";
+    li._note.textContent = "";
     li._note.title = r.status || "";
 
     var mv = li._mv, c = r.rank_change, prevText = mv.textContent;
