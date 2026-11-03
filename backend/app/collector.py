@@ -155,6 +155,7 @@ def _store_creator(s, creator_id, user, platform, label, parsed, error_items, se
             s.add(v)
             s.flush()
         else:
+            v.creator_id = creator.id  # блогера могли переименовать: видео переходит к актуальной записи
             v.url, v.published_at = p["url"] or v.url, pub
             if p["views"] is not None:  # пустое значение не затирает последнее известное
                 v.views = p["views"]
