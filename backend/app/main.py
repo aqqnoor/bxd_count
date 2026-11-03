@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from . import apify_source as src
 from .collector import RefreshRefused, execute_run, running_run, start_run
 from .config import Settings
-from .db import Run, import_creators, make_session_factory
+from .db import Run, import_creators, make_session_factory, utcnow
 from .ranking import build_ranking, creator_videos, last_good_run, save_totals, to_local_iso
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +28,12 @@ def create_app(settings: Optional[Settings] = None, client_factory=src.get_clien
     tz = ZoneInfo(settings.tz)
 
     with session_factory() as s:
+        # Сервер работает в одном процессе: если при старте в базе остался запуск «идёт», значит, сервер
+        # перезапускали посреди сбора, и этот запуск уже мёртв. Помечаем его, чтобы он не блокировал новые.
+        for r in s.query(Run).filter(Run.status == "running"):
+            r.status, r.finished_at = "failed", utcnow()
+            r.message = "Прерван: сервер был перезапущен во время сбора"
+        s.commit()
         if os.path.exists(settings.creators_file):
             n = import_creators(s, settings.creators_file)
             logging.info("Загружено блогеров из списка: %s", n)

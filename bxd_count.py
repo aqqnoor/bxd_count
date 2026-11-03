@@ -39,6 +39,7 @@ def parse_args():
     p.add_argument("--tz", default="Asia/Almaty")
     p.add_argument("--hashtag", default="BXDBATTLE")
     p.add_argument("--out", default="result.xlsx")
+    p.add_argument("--json", default="results.json", help="файл с данными для сайта")
     p.add_argument("--max-videos", type=int, default=30,
                    help="сколько последних роликов брать у каждого аккаунта (влияет на расход кредитов)")
     p.add_argument("--batch", type=int, default=20, help="сколько аккаунтов за один запуск скрейпера")
@@ -364,6 +365,53 @@ def main():
             sheet.column_dimensions[get_column_letter(col)].width = min(max(width + 2, 12), 60)
 
     wb.save(a.out)
+
+    # ---- данные для сайта ----
+    # Если платформа в этот раз не получена, берём прошлые значения из results.json,
+    # чтобы на сайте не пропадали просмотры из-за временного сбоя.
+    prev = {}
+    if os.path.exists(a.json):
+        try:
+            with open(a.json, encoding="utf-8") as f:
+                prev = {r["name"]: r for r in json.load(f).get("rows", [])}
+        except (ValueError, KeyError, OSError):
+            prev = {}
+    site_rows = []
+    for r in rows:
+        old = prev.get(r["name"], {})
+        tt_v, ig_v, tt_n, ig_n, status = r["tt_views"], r["ig_views"], r["tt_n"], r["ig_n"], r["status"]
+        carried = False
+        if r["tt"] and tt_v is None and old.get("tt_views") is not None:
+            tt_v, tt_n, carried = old["tt_views"], old.get("tt_videos"), True
+        if r["ig"] and ig_v is None and old.get("ig_views") is not None:
+            ig_v, ig_n, carried = old["ig_views"], old.get("ig_videos"), True
+        got = [x for x in (tt_v, ig_v) if x is not None]
+        if carried:
+            status = "часть данных от прошлого обновления; " + status
+        site_rows.append({
+            "name": r["name"], "tiktok": r["tt"] or None, "instagram": r["ig"] or None,
+            "tt_views": tt_v, "ig_views": ig_v, "total": sum(got) if got else None,
+            "tt_videos": tt_n, "ig_videos": ig_n, "complete": status == "OK", "status": status,
+        })
+    site_rows.sort(key=lambda r: (r["total"] is not None, r["total"] or 0), reverse=True)
+    for n, r in enumerate(site_rows, 1):
+        r["rank"] = n
+        p = prev.get(r["name"], {})
+        r["rank_change"] = (p["rank"] - n) if p.get("rank") else None      # плюс = поднялся
+        r["delta"] = (r["total"] - p["total"]) if (r["total"] is not None and p.get("total") is not None) else None
+    site = {
+        "generated_at": datetime.now(tz).isoformat(timespec="seconds"),
+        "hashtag": a.hashtag,
+        "period": {"start": a.start, "end": a.end, "tz": a.tz},
+        "totals": {
+            "views": sum(r["total"] or 0 for r in site_rows),
+            "bloggers": len(site_rows),
+            "videos": len(videos_rows),
+        },
+        "rows": site_rows,
+    }
+    with open(a.json, "w", encoding="utf-8") as f:
+        json.dump(site, f, ensure_ascii=False, indent=1)
     print(f"\nГотово: {a.out}. Блогеров: {len(rows)}, роликов: {len(videos_rows)}, проблем: {len(problems)}")
 
 
