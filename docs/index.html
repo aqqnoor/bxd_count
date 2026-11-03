@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BXD Battle: мониторинг просмотров</title>
+<link rel="icon" type="image/png" href="icon.png">
+<meta name="description" content="Мониторинг BXD Battle: рейтинг всех участников по сумме просмотров роликов с хэштегом BXDBATTLE.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --red: #DE3E3C;            /* фирменный красный из логотипа */
+    --red-deep: #B72A2A;
+    --red-ink: #B3261E;        /* красный для мелкого текста: хватает контраста на белом */
+    --red-tint: #FDECEB;
+    --red-glow: rgba(222, 62, 60, .10);
+    --ink: #1B1B1F;
+    --muted: #5F5F68;
+    --line: #EBDADA;
+    --bg: #FFFFFF;
+    --surface: #FFFFFF;
+    --soft: #FAF6F6;
+    --graphite: #3A3A40;
+    --up: #0B7A43;
+    --up-glow: rgba(11, 122, 67, .14);
+    --down: #A85305;
+    --focus: #1D4ED8;
+    --shadow: 0 1px 2px rgba(60, 20, 20, .05), 0 8px 22px rgba(60, 20, 20, .06);
+    --font: "Archivo", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px;
+    line-height: 1.4; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---- шапка ---- */
+  .hero { position: relative; overflow: hidden; padding: 22px 0 30px; border-bottom: 3px solid var(--red);
+    background:
+      radial-gradient(560px 280px at 92% -20%, var(--red-glow), transparent 70%),
+      radial-gradient(420px 220px at 0% 120%, rgba(222, 62, 60, .06), transparent 70%),
+      #fff; }
+  .top { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; justify-content: space-between; }
+  .logo { display: block; height: 84px; width: auto; }
+  h1 { margin: 18px 0 0; font-size: clamp(40px, 8vw, 72px); line-height: .92; font-weight: 850;
+    font-variation-settings: "wdth" 125; letter-spacing: -0.02em; color: var(--ink); }
+  .live { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted);
+    background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; }
+  .live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); flex: none; }
+  .live.running .dot { animation: pulse 1.2s ease-in-out infinite; }
+  .live.stale .dot { background: #A85305; }
+  .live b { color: var(--ink); font-weight: 650; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(222,62,60,.55); } 50% { box-shadow: 0 0 0 7px rgba(222,62,60,0); } }
+
+  .heroGrid { display: grid; grid-template-columns: 1fr minmax(280px, 380px); gap: 20px 40px; align-items: end; margin-top: 22px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 14px 38px; font-size: 15px; color: var(--muted); }
+  .stats b { display: block; font-size: clamp(26px, 4vw, 38px); font-weight: 850; color: var(--ink);
+    font-variation-settings: "wdth" 112; font-variant-numeric: tabular-nums; line-height: 1.1; }
+
+  .leader { position: relative; overflow: hidden; border-radius: 18px; padding: 16px 20px 18px; color: #fff;
+    background: linear-gradient(135deg, #E9534F 0%, var(--red-deep) 100%); box-shadow: 0 12px 28px rgba(183, 42, 42, .28); }
+  .leader[hidden] { display: none; }
+  .leader::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%);
+    transform: translateX(-120%); }
+  .leader.flash::after { animation: shine 1.4s ease-out; }
+  @keyframes shine { to { transform: translateX(120%); } }
+  .leader .lbl { font-size: 13px; font-weight: 700; opacity: .9; }
+  .leader .lname { display: block; font-size: clamp(22px, 3.2vw, 30px); font-weight: 850; font-variation-settings: "wdth" 112; line-height: 1.1; margin-top: 2px; overflow-wrap: anywhere; }
+  .leader .lviews { display: block; font-size: clamp(26px, 4vw, 38px); font-weight: 850; font-variation-settings: "wdth" 112;
+    font-variant-numeric: tabular-nums; line-height: 1.15; margin-top: 6px; }
+  .leader .lsub { font-size: 13px; font-weight: 600; opacity: .9; }
+
+  /* ---- таблица ---- */
+  main.wrap { padding-top: 24px; padding-bottom: 56px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .caption { margin: 0; color: var(--muted); font-size: 14px; max-width: 60ch; }
+  .search { font: inherit; font-size: 15px; color: var(--ink); background: #fff; border: 1.5px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; min-width: 230px; }
+  .search::placeholder { color: var(--muted); }
+  .search:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .head, .row { display: grid; grid-template-columns: 44px 58px minmax(120px, 1.1fr) 2fr 160px; align-items: center; gap: 4px 16px; }
+  .head { padding: 0 14px 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .head .r { text-align: right; }
+  ol.board { list-style: none; margin: 0; padding: 0; position: relative; }
+  .row { padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px;
+    box-shadow: var(--shadow); transition: transform .18s ease, box-shadow .18s ease; }
+  .row:hover { transform: translateY(-2px); }
+  .row[hidden] { display: none; }
+  .row.moving { transition: transform .8s cubic-bezier(.2,.7,.2,1); position: relative; z-index: 1; }
+  .row.t1 { background: var(--red-tint); border-color: var(--red); }
+  .row.bump { animation: bump 1.8s ease-out; }
+  @keyframes bump { 0% { box-shadow: 0 0 0 0 var(--up-glow), inset 0 0 0 999px var(--up-glow); } 100% { box-shadow: var(--shadow), inset 0 0 0 999px transparent; } }
+
+  .rank { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 850;
+    font-variation-settings: "wdth" 112; font-variant-numeric: tabular-nums; font-size: 15px; background: var(--soft); color: var(--ink); border: 1px solid var(--line); }
+  .t1 .rank { background: var(--red); color: #fff; border-color: var(--red); }
+  .t2 .rank { background: var(--graphite); color: #fff; border-color: var(--graphite); }
+  .t3 .rank { background: #fff; color: var(--red-ink); border: 2px solid var(--red); }
+
+  .mv { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+  .mv.up { color: var(--up); } .mv.down { color: var(--down); }
+  .mv.up::before { content: "▲ "; font-size: 10px; vertical-align: 1px; }
+  .mv.down::before { content: "▼ "; font-size: 10px; vertical-align: 1px; }
+  .mv.pop { animation: pop .7s ease-out; }
+  @keyframes pop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
+
+  .who { min-width: 0; }
+  .name { font-weight: 650; font-size: 17px; overflow-wrap: anywhere; }
+  .t1 .name { font-size: 19px; font-weight: 750; }
+  .meta { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .note { font-size: 12px; font-weight: 650; color: var(--down); }
+  .track { height: 12px; display: flex; min-width: 0; border-radius: 6px; background: #F3E8E8; overflow: hidden; }
+  .bar { height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #F29994, var(--red));
+    transition: width 1s cubic-bezier(.2,.7,.2,1); }
+  .t1 .bar { background: linear-gradient(90deg, var(--red), var(--red-deep)); }
+  .empty { font-size: 14px; color: var(--muted); }
+  .views { text-align: right; font-weight: 850; font-size: 22px; font-variant-numeric: tabular-nums; font-variation-settings: "wdth" 108; }
+  .t1 .views { font-size: 25px; color: var(--red-ink); }
+  .views small { display: block; font-size: 12px; font-weight: 650; color: var(--muted); font-variation-settings: "wdth" 100; min-height: 1em; }
+  .views small.plus { color: var(--up); }
+
+  .msg { margin: 20px 0; padding: 16px 18px; background: var(--soft); border: 1.5px solid var(--line); border-radius: 10px; }
+  .msg[hidden] { display: none; }
+  footer { margin-top: 24px; font-size: 13px; color: var(--muted); max-width: 72ch; }
+
+  @media (max-width: 760px) {
+    .heroGrid { grid-template-columns: 1fr; gap: 18px; }
+  }
+  @media (max-width: 680px) {
+    .logo { height: 68px; }
+    .head { display: none; }
+    .row { grid-template-columns: 38px 1fr auto; padding: 12px 12px 14px; }
+    .mv { grid-column: 1; grid-row: 2; text-align: center; font-size: 12px; }
+    .who { grid-column: 2; grid-row: 1; }
+    .views { grid-column: 3; grid-row: 1; font-size: 18px; }
+    .t1 .views { font-size: 20px; }
+    .track { grid-column: 2 / 4; grid-row: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar, .row.moving, .row { transition: none; }
+    .live.running .dot, .row.bump, .mv.pop, .leader.flash::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="top">
+      <img class="logo" src="logo.png" alt="BAXADIR MED" width="82" height="84">
+      <div class="live" id="live" aria-live="polite"><i class="dot"></i><span id="liveText">Загружаем данные…</span></div>
+    </div>
+    <h1>BXD Battle</h1>
+    <div class="heroGrid">
+      <div class="stats" id="stats"></div>
+      <aside class="leader" id="leader" hidden>
+        <span class="lbl">Лидирует сейчас</span>
+        <strong class="lname" id="lname"></strong>
+        <span class="lviews" id="lviews"></span>
+        <span class="lsub" id="lsub"></span>
+      </aside>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="controls">
+    <p class="caption" id="caption"></p>
+    <input class="search" id="q" type="search" placeholder="Найти участника" aria-label="Найти участника">
+  </div>
+  <div class="head" aria-hidden="true">
+    <span>Место</span><span>Сдвиг</span><span>Участник</span><span></span><span class="r">Просмотры</span>
+  </div>
+  <ol class="board" id="board"></ol>
+  <div class="msg" id="msg" hidden></div>
+  <footer id="foot"></footer>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  // Сначала API бэкенда; если его нет (статический хостинг), читаем results.json рядом со страницей
+  var DATA_URLS = ["api/ranking", "results.json"];
+  var POLL_MS = 30 * 1000, POLL_RUNNING_MS = 10 * 1000, STALE_AFTER_MS = 36 * 3600e3;
+  var REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var state = { data: null, q: "", stamp: null, rows: new Map(), first: true, leader: null };
+  var $ = function (id) { return document.getElementById(id); };
+  var nf = new Intl.NumberFormat("ru-RU");
+  function fmt(n) { return nf.format(n); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function day(iso) { return new Date(iso + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" }); }
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+  function videosText(n) { return n + " " + plural(n, "ролик", "ролика", "роликов"); }
+  function videosOf(r) {
+    if (r.tt_videos == null && r.ig_videos == null) return null;
+    return (r.tt_videos || 0) + (r.ig_videos || 0);
+  }
+
+  // Плавный «набег» числа от прошлого значения к новому
+  function tween(node, to) {
+    var from = node._v == null ? 0 : node._v;
+    node._v = to;
+    if (node._raf) cancelAnimationFrame(node._raf);
+    if (REDUCED || from === to) { node.textContent = fmt(to); return; }
+    var t0 = performance.now(), dur = 1000;
+    (function step(t) {
+      var p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      node.textContent = fmt(Math.round(from + (to - from) * e));
+      if (p < 1) node._raf = requestAnimationFrame(step);
+    })(t0);
+  }
+
+  function ago(ms) {
+    var m = Math.floor(ms / 60000);
+    if (m < 1) return "только что";
+    if (m < 60) return m + " мин назад";
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + " ч назад";
+    return Math.floor(h / 24) + " дн назад";
+  }
+
+  function renderLive() {
+    var d = state.data; if (!d) return;
+    var box = $("live"), txt = $("liveText");
+    box.classList.toggle("running", !!d.running);
+    if (d.running) { box.classList.remove("stale"); txt.innerHTML = "<b>Идёт обновление данных…</b>"; return; }
+    if (!d.generated_at) { box.classList.add("stale"); txt.textContent = "Данные ещё не собраны"; return; }
+    var t = new Date(d.generated_at), age = Date.now() - t.getTime();
+    box.classList.toggle("stale", age > STALE_AFTER_MS);
+    txt.textContent = "";
+    txt.append("Обновлено ", Object.assign(document.createElement("b"), { textContent: ago(age) }),
+      ", " + t.toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }));
+  }
+
+  var statNodes = null;
+  function renderStats(d) {
+    if (!statNodes) {
+      var box = $("stats"); box.innerHTML = "";
+      statNodes = {};
+      [["views", "всего просмотров"], ["people", "участников"], ["videos", "роликов в рейтинге"]].forEach(function (x) {
+        var s = el("span"), b = el("b"); s.append(b, x[1]); box.appendChild(s); statNodes[x[0]] = b;
+      });
+    }
+    tween(statNodes.views, d.totals.views);
+    tween(statNodes.people, d.totals.bloggers);
+    tween(statNodes.videos, d.totals.videos || 0);
+  }
+
+  function renderLeader(d) {
+    var r = d.rows.length && d.rows[0].total > 0 ? d.rows[0] : null;   // пока нет просмотров, лидера не показываем
+    var box = $("leader");
+    box.hidden = !r;
+    if (!r) return;
+    var key = r.id != null ? r.id : r.name;
+    if (state.leader !== null && state.leader !== key && !REDUCED) {   // смена лидера
+      box.classList.remove("flash"); void box.offsetWidth; box.classList.add("flash");
+    }
+    state.leader = key;
+    $("lname").textContent = r.name;
+    tween($("lviews"), r.total);
+    var v = videosOf(r);
+    $("lsub").textContent = "просмотров" + (v != null ? ", " + videosText(v) : "");
+  }
+
+  function renderStatic(d) {
+    $("caption").textContent = "Просмотры роликов с хэштегом #" + d.hashtag + ". Период: с " + day(d.period.start) + " по " + day(d.period.end) + ".";
+    renderStats(d); renderLeader(d);
+    $("foot").textContent = "Считаются ролики, у которых хэштег #" + d.hashtag + " указан в подписи и которые опубликованы " +
+      "в период кампании. Количество роликов показано для справки и на место в рейтинге не влияет. Стрелка показывает, " +
+      "на сколько мест участник поднялся или опустился с прошлого обновления, а «+» под числом — прирост просмотров за это время. " +
+      "Пометка «данные неполные» значит, что часть данных участника получить не удалось.";
+  }
+
+  function keyOf(r) { return r.id != null ? "id" + r.id : "n" + r.name; }
+
+  function makeRow() {
+    var li = el("li", "row");
+    li._rank = el("div", "rank"); li._mv = el("div", "mv");
+    var who = el("div", "who");
+    li._name = el("div", "name"); li._meta = el("div", "meta"); li._note = el("div", "note");
+    who.append(li._name, li._meta, li._note);
+    var track = el("div", "track");
+    li._bar = el("div", "bar"); li._bar.setAttribute("role", "img");
+    li._empty = el("span", "empty", "нет данных");
+    track.append(li._bar, li._empty);
+    li._vnum = el("span"); li._small = el("small");
+    var views = el("div", "views"); views.append(li._vnum, li._small);
+    li.append(li._rank, li._mv, who, track, views);
+    return li;
+  }
+
+  function fillRow(li, r, max) {
+    var firstFill = li._total === undefined;
+    li.classList.remove("t1", "t2", "t3");
+    if (r.rank <= 3 && r.total != null) li.classList.add("t" + r.rank);
+    li._rank.textContent = String(r.rank);
+    li._name.textContent = r.name;
+    var v = r.total != null ? videosOf(r) : null;
+    li._meta.textContent = v == null ? "" : videosText(v);
+    li._note.textContent = r.complete ? "" : "данные неполные";
+    li._note.title = r.status || "";
+
+    var mv = li._mv, c = r.rank_change, prevText = mv.textContent;
+    mv.classList.remove("up", "down");
+    if (c == null) { mv.textContent = ""; mv.removeAttribute("aria-label"); }
+    else if (c > 0) { mv.classList.add("up"); mv.textContent = String(c); mv.setAttribute("aria-label", "поднялся на " + c); }
+    else if (c < 0) { mv.classList.add("down"); mv.textContent = String(-c); mv.setAttribute("aria-label", "опустился на " + (-c)); }
+    else { mv.textContent = "—"; mv.setAttribute("aria-label", "без изменений"); }
+    if (!firstFill && c && mv.textContent !== prevText && !REDUCED) { mv.classList.remove("pop"); void mv.offsetWidth; mv.classList.add("pop"); }
+
+    if (r.total == null) {
+      li._bar.hidden = true; li._empty.hidden = false;
+      li._vnum.textContent = "—"; li._vnum._v = null; li._small.textContent = ""; li._small.className = "";
+    } else {
+      li._bar.hidden = false; li._empty.hidden = true;
+      li._bar.dataset.w = max ? (r.total / max) * 100 : 0;
+      li._bar.setAttribute("aria-label", r.name + ": " + fmt(r.total) + " просмотров");
+      tween(li._vnum, r.total);
+      li._small.className = r.delta > 0 ? "plus" : "";
+      li._small.textContent = r.delta == null ? "" : r.delta > 0 ? "+" + fmt(r.delta) : "без прироста";
+      if (!firstFill && li._total != null && r.total > li._total && !REDUCED) {   // просмотры выросли
+        li.classList.remove("bump"); void li.offsetWidth; li.classList.add("bump");
+      }
+    }
+    li._total = r.total;
+  }
+
+  function render() {
+    var d = state.data; if (!d) return;
+    var board = $("board"), q = state.q.trim().toLowerCase();
+    var max = d.rows.reduce(function (m, r) { return Math.max(m, r.total || 0); }, 0);
+
+    var before = new Map();   // где строки стояли до обновления
+    state.rows.forEach(function (li, k) { if (li.isConnected && !li.hidden) before.set(k, li.getBoundingClientRect().top); });
+
+    var seen = {};
+    d.rows.forEach(function (r) {
+      var k = keyOf(r); seen[k] = true;
+      var li = state.rows.get(k);
+      if (!li) { li = makeRow(); state.rows.set(k, li); }
+      fillRow(li, r, max);
+      li.hidden = !!q && (r.name + " " + (r.tiktok || "") + " " + (r.instagram || "")).toLowerCase().indexOf(q) === -1;
+      board.appendChild(li);   // порядок = порядок данных
+    });
+    state.rows.forEach(function (li, k) { if (!seen[k]) { li.remove(); state.rows.delete(k); } });
+
+    var apply = function () { state.rows.forEach(function (li) { if (!li._bar.hidden) li._bar.style.width = li._bar.dataset.w + "%"; }); };
+    if (state.first) requestAnimationFrame(function () { requestAnimationFrame(apply); }); else apply();
+
+    if (!state.first && !q && !REDUCED) {   // плавная перестановка строк
+      state.rows.forEach(function (li, k) {
+        if (!before.has(k) || li.hidden) return;
+        var dy = before.get(k) - li.getBoundingClientRect().top;
+        if (Math.abs(dy) < 2) return;
+        li.classList.remove("moving"); li.style.transform = "translateY(" + dy + "px)";
+        requestAnimationFrame(function () { requestAnimationFrame(function () {
+          li.classList.add("moving"); li.style.transform = "";
+          setTimeout(function () { li.classList.remove("moving"); }, 900);
+        }); });
+      });
+    }
+    state.first = false;
+
+    var msg = $("msg");
+    if (!d.rows.length) { msg.hidden = false; msg.textContent = "Пока нет данных для рейтинга."; }
+    else if (q && !Array.from(state.rows.values()).some(function (li) { return !li.hidden; })) {
+      msg.hidden = false; msg.textContent = "Никого не нашли. Проверьте написание имени или ника.";
+    } else msg.hidden = true;
+  }
+
+  function fetchJson(i) {
+    if (i >= DATA_URLS.length) return Promise.reject(new Error("no source"));
+    return fetch(DATA_URLS[i] + "?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        if ((r.headers.get("content-type") || "").indexOf("json") === -1) throw new Error("not json");
+        return r.json();
+      })
+      .catch(function () { return fetchJson(i + 1); });
+  }
+
+  function load() {
+    return fetchJson(0)
+      .then(function (d) {
+        var stamp = String(d.generated_at) + "|" + !!d.running;
+        if (state.stamp === stamp && state.data) return;
+        state.stamp = stamp; state.data = d;
+        renderStatic(d); render(); renderLive();
+      })
+      .catch(function () {
+        if (!state.data) {
+          var m = $("msg"); m.hidden = false;
+          m.textContent = "Не удалось загрузить данные. Обновите страницу через минуту.";
+          $("liveText").textContent = "Нет связи с сервером";
+        }
+      })
+      .then(function () { setTimeout(load, state.data && state.data.running ? POLL_RUNNING_MS : POLL_MS); });
+  }
+
+  $("q").addEventListener("input", function (e) { state.q = e.target.value; render(); });
+  setInterval(renderLive, 30 * 1000);   // «обновлено N мин назад» тикает сам
+  load();
+})();
+</script>
+</body>
+</html>
