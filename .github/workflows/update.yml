@@ -4,11 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       max_videos:
-        description: "Сколько последних роликов читать у каждого блогера (для первого запуска ставьте 40-60)"
+        description: "Сколько последних роликов читать у каждого блогера (глубокий проход: 40, обычный: 10)"
         default: "40"
-#   schedule:
-#     - cron: "0 3 * * *"   # каждый день 08:00 по Алматы: свежая часть ленты (10 роликов)
-#     - cron: "0 2 * * 1"   # по понедельникам 07:00 по Алматы: глубокий проход (40 роликов)
+      start_date:
+        description: "Начало периода (YYYY-MM-DD)"
+        default: "2026-10-01"
+#  schedule:
+#    - cron: "0 3 * * *"   # каждый день 08:00 по Алматы: 10 последних роликов
+#    - cron: "0 2 * * 1"   # по понедельникам 07:00 по Алматы: глубокий проход (40 роликов)
 
 permissions:
   contents: write
@@ -28,9 +31,16 @@ jobs:
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           MAX: ${{ github.event.inputs.max_videos || (github.event.schedule == '0 2 * * 1' && '40' || '10') }}
+          START: ${{ github.event.inputs.start_date || '2026-10-01' }}
         run: |
-          python bxd_count.py --bloggers bloggers.csv --start 2026-10-01 --end "$(TZ=Asia/Almaty date +%F)" \
-            --max-videos "$MAX" --skip-tt --memory docs/videos_memory.json \
+          rm -f cache.json   # старый кэш не должен подменять свежий запрос
+          # прошлые данные нужны для сдвига мест, прироста «+» и чтобы сбой не обнулял сайт
+          cp docs/results.json results.json 2>/dev/null || true
+          # в обычном (коротком) запуске закреплённые ролики пропускаем, чтобы они не занимали слоты лимита;
+          # в глубоком проходе читаем всё, чтобы закреплённый ролик с хэштегом тоже попал в подсчёт
+          EXTRA=""; if [ "$MAX" -le 15 ]; then EXTRA="--skip-pinned"; fi
+          python bxd_count.py --bloggers bloggers.csv --start "$START" --end "$(TZ=Asia/Almaty date +%F)" \
+            --max-videos "$MAX" --skip-tt $EXTRA --memory docs/videos_memory.json \
             --json results.json --out result.xlsx
           cp results.json docs/results.json
       - name: Commit data

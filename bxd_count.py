@@ -47,6 +47,9 @@ def parse_args():
     p.add_argument("--token", default=None, help="токен Apify (или переменная APIFY_TOKEN)")
     p.add_argument("--memory", default="", help="файл, где запоминаются найденные ролики (например docs/videos_memory.json): "
                    "ролики, выпавшие из свежей части ленты, не теряются и не перечитываются")
+    p.add_argument("--skip-pinned", action="store_true",
+                   help="Instagram: не читать закреплённые ролики (они занимают слоты лимита); "
+                        "закреплённый ролик с хэштегом при этом не будет засчитан")
     p.add_argument("--skip-ig", action="store_true")
     p.add_argument("--skip-tt", action="store_true")
     return p.parse_args()
@@ -164,11 +167,14 @@ def parse_instagram(item, tz):
     }
 
 
-def build_input(platform, usernames, max_videos):
+def build_input(platform, usernames, max_videos, skip_pinned=False):
     if platform == "tt":
         return {"profiles": usernames, "resultsPerPage": max_videos,
                 "profileScrapeSections": ["videos"], "profileSorting": "latest"}
-    return {"username": usernames, "resultsLimit": max_videos}
+    inp = {"username": usernames, "resultsLimit": max_videos}
+    if skip_pinned:
+        inp["skipPinnedPosts"] = True
+    return inp
 
 
 # ---------------- сбор по платформе ----------------
@@ -182,7 +188,7 @@ def collect_platform(client, platform, pending, cache, a, tz, start, end, state)
         users = [u for _, u in chunk]
         print(f"  {label}: запуск скрейпера для {len(users)} аккаунтов…")
         try:
-            items, cost = run_actor(client, actor, build_input(platform, users, a.max_videos))
+            items, cost = run_actor(client, actor, build_input(platform, users, a.max_videos, a.skip_pinned))
         except Exception as e:  # noqa: BLE001
             print(f"  {label}: ошибка запуска — {str(e)[:200]}")
             for key, _ in chunk:
@@ -308,10 +314,12 @@ def main():
         print("\nОстановлено вручную. Собранное сохранено в cache.json; строю отчёт по тому, что есть.")
     save_cache(cache)
     if a.memory:
-        mem = {k: {"tt": r.get("tt", []), "ig": r.get("ig", [])} for k, r in cache.items()
-               if (r.get("tt_done") or r.get("ig_done"))}
-        for k, v in memory.items():          # блогеры, которых не трогали в этом запуске, не теряем
-            mem.setdefault(k, v)
+        # по каждой платформе пишем новые данные только если запрос удался; иначе остаётся прежняя память
+        mem = {k: dict(v) for k, v in memory.items()}
+        for k, r in cache.items():
+            for pl in ("tt", "ig"):
+                if r.get(f"{pl}_done") and r.get(f"{pl}_err") is None:
+                    mem.setdefault(k, {})[pl] = r.get(pl, [])
         os.makedirs(os.path.dirname(a.memory) or ".", exist_ok=True)
         with open(a.memory, "w", encoding="utf-8") as f:
             json.dump(mem, f, ensure_ascii=False)
