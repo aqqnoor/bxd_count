@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-04T13:08:10+05:00",
+ "generated_at": "2026-11-04T13:13:12+05:00",
  "hashtag": "BXDBATTLE",
  "period": {
   "start": "2026-10-01",
@@ -7,9 +7,9 @@
   "tz": "Asia/Almaty"
  },
  "totals": {
-  "views": 0,
+  "views": 321018,
   "bloggers": 3,
-  "videos": 0
+  "videos": 17
  },
  "rows": [
   {
@@ -17,12 +17,12 @@
    "tiktok": null,
    "instagram": "baxadir.med",
    "tt_views": null,
-   "ig_views": null,
-   "total": null,
+   "ig_views": 308935,
+   "total": 308935,
    "tt_videos": null,
-   "ig_videos": null,
-   "complete": false,
-   "status": "Instagram не получен",
+   "ig_videos": 9,
+   "complete": true,
+   "status": "OK",
    "rank": 1,
    "rank_change": null,
    "delta": null
@@ -32,12 +32,12 @@
    "tiktok": null,
    "instagram": "tleugaliyeva.a",
    "tt_views": null,
-   "ig_views": null,
-   "total": null,
+   "ig_views": 12083,
+   "total": 12083,
    "tt_videos": null,
-   "ig_videos": null,
-   "complete": false,
-   "status": "Instagram не получен",
+   "ig_videos": 8,
+   "complete": true,
+   "status": "OK",
    "rank": 2,
    "rank_change": null,
    "delta": null
@@ -47,12 +47,12 @@
    "tiktok": null,
    "instagram": "aqqnoor",
    "tt_views": null,
-   "ig_views": null,
-   "total": null,
+   "ig_views": 0,
+   "total": 0,
    "tt_videos": null,
-   "ig_videos": null,
-   "complete": false,
-   "status": "Instagram не получен",
+   "ig_videos": 0,
+   "complete": true,
+   "status": "OK",
    "rank": 3,
    "rank_change": null,
    "delta": null
